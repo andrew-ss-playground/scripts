@@ -48,9 +48,21 @@ def get_order_id(row: dict) -> int:
 
 def fetch_item_description(client: StorageScholarsClient, order_id: int) -> str:
     items: list[dict[str, Any]] = client.get_request(url=f"/order/items/{order_id}")
-    if items:
-        return ", ".join([f"{item['Quantity']}x {item['ItemTitle']}" for item in items])
-    return ""
+    if items is None or len(items) == 0:
+        logging.warning(f"Could not get items for order {order_id}")
+        return ""
+    
+    return ", ".join([f"{item['Quantity']}x {item['ItemTitle']}" for item in items])
+
+def fetch_storage_unit(client: StorageScholarsClient, order_id: int) -> str:
+    url: str = "/worklist/dropoff"
+    params: dict[str, int] = {'OrderID': order_id}
+    dropoff_info: dict[str, Any] | None = client.get_request(url=url, params=params)
+    if dropoff_info is None or dropoff_info.get('StorageUnitName') is None or dropoff_info.get('Quadrant') is None:
+        logging.warning(f"Could not get storage unit info for order {order_id}")
+        return ""
+
+    return f"{dropoff_info['StorageUnitName']} {dropoff_info['Quadrant']}"
 
 def fetch_pronunciation(first_name: str) -> str | None:
     try:
@@ -68,12 +80,19 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any
                 first_name = old_row["FullName"].split(" ")[0]
                 
                 new_rows.append({
-                    'Items': fetch_item_description(client=client, order_id=order_id),
+                    "ID": old_row.get('OrderID'),
+                    "Name": old_row.get('FullName'),
                     'Pronunciation': fetch_pronunciation(first_name=first_name) or "",
-                    'StudentPhone': parse_phone(old_row['StudentPhone']),
-                    'ParentPhone': parse_phone(old_row['ParentPhone']),
-                    'Dropoff Location Full': parse_full_location(old_row),
-                    # 'Storage Unit': fetch_storage_unit(client=client, order_id=order_id),
+                    'Phone': parse_phone(old_row['StudentPhone']),
+                    'Location': parse_full_location(old_row),
+                    'Ct.': old_row.get('ItemCount'),
+                    'Items': fetch_item_description(client=client, order_id=order_id),
+                    'Time Loaded': '',
+                    'Time Arrived': '',
+                    'Time Delivered': '',
+
+                    'Storage Unit': fetch_storage_unit(client=client, order_id=order_id),
+                    'Parent Phone': parse_phone(old_row['ParentPhone']),
                     # 'Comments': get_comments(old_row), # proxy name, proxy phone, is first hour, is last hour, has pending balance
                 })
                 # download image
