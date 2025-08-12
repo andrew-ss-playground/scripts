@@ -1,7 +1,6 @@
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
-from typing import Optional
 import logging
 
 OPENAI_MODEL="gpt-4.1-nano"

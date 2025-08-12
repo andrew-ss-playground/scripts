@@ -54,6 +54,18 @@ def fetch_pronunciation(first_name: str) -> str | None:
         logger.warning(f"Could not fetch pronunciation of {first_name}: {error_message}")
         return None
 
+def fetch_and_add_more_details(client: StorageScholarsClient, order_id: int, row: dict[str, Any]) -> dict[str, Any]:
+    first_name = row["FullName"].split(" ")[0]
+    row['Items'] = fetch_item_description(client=client, order_id=order_id)
+    row['Pronunciation'] = fetch_pronunciation(first_name=first_name) or ""
+    # row['Phone'] = get_formatted_phone(row['StudentPhone'])
+    # row['Parent Phone'] = get_formatted_phone(row['ParentPhone'])
+    # row['Storage Unit'] = fetch_storage_unit(client=client, order_id=order_id)
+    # row['Dropoff Location Full'] = get_formatted_location(row)
+    # row['Comments'] = get_comments(row) # proxy name, proxy phone, is first hour, is last hour, has pending balance
+    # download images
+    return row
+
 def write_to_csv(file_name: str, rows: list[dict], fieldnames: list[str]) -> str:
     for key in rows[0].keys():
         if key not in fieldnames:
@@ -84,15 +96,7 @@ def main() -> None:
             for key, row in enumerate(rows):
                 try:
                     order_id = get_order_id(row)
-                    first_name = row["FullName"].split(" ")[0]
-                    row['Items'] = fetch_item_description(client=client, order_id=order_id)
-                    row['Pronunciation'] = fetch_pronunciation(first_name=first_name) or ""
-                    # row['Phone'] = get_formatted_phone(row['StudentPhone'])
-                    # row['Parent Phone'] = get_formatted_phone(row['ParentPhone'])
-                    # row['Storage Unit'] = fetch_storage_unit(client=client, order_id=order_id)
-                    # row['Dropoff Location Full'] = get_formatted_location(row)
-                    # row['Comments'] = get_comments(row) # proxy name, proxy phone, is first hour, is last hour, has pending balance
-                    # download images
+                    rows[key] = fetch_and_add_more_details(client=client, order_id=order_id, row=row)
                 except Exception as error_message:
                     logger.warning(f"Failed to fetch details for row #{key}: {error_message}")
                 bar()
