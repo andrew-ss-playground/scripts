@@ -1,5 +1,6 @@
 from services.client import StorageScholarsClient
 from utils.openai import ask_openai
+from utils.parsing import parse_phone, parse_full_location
 
 import os
 from dotenv import load_dotenv
@@ -15,6 +16,10 @@ REQUEST_DELAY = 0.6
 
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(name=__name__)
+
+def add_suffix_to_file_name(file_name, suffix):
+    parts = file_name.split(".")
+    return f"{parts[0]}{suffix}.{parts[1]}"
 
 def get_client() -> StorageScholarsClient:
     load_dotenv()
@@ -54,56 +59,63 @@ def fetch_pronunciation(first_name: str) -> str | None:
         logger.warning(f"Could not fetch pronunciation of {first_name}: {error_message}")
         return None
 
-def fetch_and_add_more_details(client: StorageScholarsClient, order_id: int, row: dict[str, Any]) -> dict[str, Any]:
-    first_name = row["FullName"].split(" ")[0]
-    row['Items'] = fetch_item_description(client=client, order_id=order_id)
-    row['Pronunciation'] = fetch_pronunciation(first_name=first_name) or ""
-    # row['Phone'] = get_formatted_phone(row['StudentPhone'])
-    # row['Parent Phone'] = get_formatted_phone(row['ParentPhone'])
-    # row['Storage Unit'] = fetch_storage_unit(client=client, order_id=order_id)
-    # row['Dropoff Location Full'] = get_formatted_location(row)
-    # row['Comments'] = get_comments(row) # proxy name, proxy phone, is first hour, is last hour, has pending balance
-    # download images
-    return row
+def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    new_rows: list[dict[str, Any]] = []
+    with alive_bar(len(old_rows), title="Fetching orders") as bar:
+        for key, old_row in enumerate(old_rows):
+            try:
+                order_id = get_order_id(old_row)
+                first_name = old_row["FullName"].split(" ")[0]
+                
+                new_rows.append({
+                    'Items': fetch_item_description(client=client, order_id=order_id),
+                    'Pronunciation': fetch_pronunciation(first_name=first_name) or "",
+                    'StudentPhone': parse_phone(old_row['StudentPhone']),
+                    'ParentPhone': parse_phone(old_row['ParentPhone']),
+                    'Dropoff Location Full': parse_full_location(old_row),
+                    # 'Storage Unit': fetch_storage_unit(client=client, order_id=order_id),
+                    # 'Comments': get_comments(old_row), # proxy name, proxy phone, is first hour, is last hour, has pending balance
+                })
+                # download image
+            except Exception as error_message:
+                logger.warning(f"Failed to fetch details for row #{key}: {error_message}")
+            
+            bar()
+            time.sleep(REQUEST_DELAY) 
+    return new_rows
 
-def write_to_csv(file_name: str, rows: list[dict], fieldnames: list[str]) -> str:
-    for key in rows[0].keys():
-        if key not in fieldnames:
-            fieldnames.append(key)
-    
-    attempt = 1
+def write_to_csv(file_name: str, rows: list[dict]) -> str:
+    attempt = 0
     while True:
         try:
-            with open(file_name, mode="w", newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            with open(file=file_name, mode="w", newline='', encoding='utf-8') as csv_file:
+                writer = csv.DictWriter(csv_file, fieldnames=list(rows[0].keys()))
                 writer.writeheader()
                 writer.writerows(rows)
             break
         except PermissionError:
-            logger.warning(f"Permission Error: Could not write to {file_name}, retrying...")
-            base = file_name.split(".")[0]
-            file_name = f"{base} ({attempt}).csv"
+            logger.warning(f"Could not write to {file_name}, trying again...")
+            attempt += 1
+            file_name = add_suffix_to_file_name(file_name=file_name, suffix=f" ({attempt})")
+        except Exception as error_message:
+            raise(error_message)
     return file_name
 
 def main() -> None:
     logger.info(msg="Starting...")
     try:
         client: StorageScholarsClient = get_client()
-        rows, fieldnames = get_rows_and_fieldnames(ORDER_IDS_FILE_NAME)
-        logger.info(msg=f"Getting details for {len(rows)} order(s)")
+        logger.info(msg=f"Connected to Storage Scholars client")
 
-        with alive_bar(len(rows), title="Fetching orders") as bar:
-            for key, row in enumerate(rows):
-                try:
-                    order_id = get_order_id(row)
-                    rows[key] = fetch_and_add_more_details(client=client, order_id=order_id, row=row)
-                except Exception as error_message:
-                    logger.warning(f"Failed to fetch details for row #{key}: {error_message}")
-                bar()
-                time.sleep(REQUEST_DELAY)
+        old_rows, fieldnames = get_rows_and_fieldnames(ORDER_IDS_FILE_NAME)
+        logger.info(msg=f"Getting details for {len(old_rows)} order(s)")
 
-        file_name = write_to_csv(ORDER_IDS_FILE_NAME, rows, fieldnames)
-        logger.info(msg=f"Updated details of {len(rows)} order(s) in {file_name}.")
+        new_rows = get_updated_rows(client=client, old_rows=old_rows)
+        logger.info(msg=f"Updated details of {len(new_rows)} order(s).")
+
+        output_file_name = add_suffix_to_file_name(ORDER_IDS_FILE_NAME, "_output")
+        file_name = write_to_csv(output_file_name, new_rows)
+        logger.info(msg=f"Saved rows to {file_name}.")
     except Exception as error_message:
         logger.exception(msg=error_message)
     logger.info(msg="Finished")
