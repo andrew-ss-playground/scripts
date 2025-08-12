@@ -27,7 +27,7 @@ class StorageScholarsClient:
             'sec-ch-ua-mobile': '?0',
         })
 
-    def get_request(self, url: str, params: dict[str, Any] = {}) -> Any:
+    def get_request(self, url: str, params: dict[str, Any] = {}) -> list[dict[str, Any]] | None:
         """Sends a get request with the client
 
         Args:

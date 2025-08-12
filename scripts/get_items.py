@@ -2,6 +2,7 @@ from services.client import StorageScholarsClient
 import os
 from dotenv import load_dotenv
 import logging
+from typing import Any
 
 LOG_LEVEL = logging.INFO
 
@@ -16,15 +17,16 @@ def get_client() -> StorageScholarsClient:
 
     return StorageScholarsClient(api_key=api_key)
 
-def main():
+def main() -> None:
     try:
-        client = get_client()
-        order_id = 95003
-        items = client.get_request(url=f"/order/items/{order_id}")
+        client: StorageScholarsClient = get_client()
+        order_id: int = 95003
+        items: list[dict[str, Any]] | None = client.get_request(url=f"/order/items/{order_id}")
         if items is None or len(items) == 0:
             raise Exception("Items is None")
         
-        print(items)
+        item_description = ", ".join([f"{item["Quantity"]}x {item["ItemTitle"]}" for item in items])
+        print(item_description)
     except Exception as error_message:
         logger.exception(msg=error_message)
 
