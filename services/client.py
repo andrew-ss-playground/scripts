@@ -27,7 +27,7 @@ class StorageScholarsClient:
             'sec-ch-ua-mobile': '?0',
         })
 
-    def get_request(self, url: str, params: dict[str, Any] = {}) -> list[dict[str, Any]] | None:
+    def get_request(self, url: str, params: dict[str, Any] = {}) -> list[dict[str, Any]]:
         """Sends a get request with the client
 
         Args:
@@ -43,6 +43,6 @@ class StorageScholarsClient:
             response.raise_for_status()
             return response.json()
         except requests.RequestException as error_message:
-            logger.exception(msg=f"Get request failed: {error_message}")
+            raise Exception(f"Get request failed: {error_message}")
         except Exception as error_message:
-            logger.exception(msg=f"Unexpected error: {error_message}")
+            raise Exception(f"Unexpected error: {error_message}")
