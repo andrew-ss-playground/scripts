@@ -6,10 +6,12 @@ import logging
 from typing import Any
 import csv
 import time
+from alive_progress import alive_bar
 
 LOG_LEVEL = logging.INFO
 ORDER_ID_FILE_NAME = "data\\order_ids_8-21-25.csv"
 REQUEST_DELAY = 0.3
+DELAY_MIN_REQUESTS = 50
 
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(name=__name__)
@@ -76,10 +78,12 @@ def main() -> None:
         logger.info(msg=f"Getting items for {len(order_ids)} order(s)")
 
         rows: list[dict[str, int | str]] = []
-        for order_id in order_ids:
-            item_description = fetch_item_description(client=client, order_id=order_id)
-            rows.append({"order_id": order_id, "items": item_description})
-            time.sleep(REQUEST_DELAY)
+        with alive_bar(len(order_ids), title="Fetching orders") as bar:
+            for order_id in order_ids:
+                item_description = fetch_item_description(client=client, order_id=order_id)
+                rows.append({"order_id": order_id, "items": item_description})
+                bar()
+                time.sleep(REQUEST_DELAY if len(order_ids) >= DELAY_MIN_REQUESTS else 0)
 
         output_file_name = add_suffix_to_file_name(file_name=ORDER_ID_FILE_NAME, suffix="_output")
         save_items_to_csv(file_name=output_file_name, rows=rows)
