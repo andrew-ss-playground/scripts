@@ -41,6 +41,12 @@ def get_order_ids(file_name: str) -> list[int]:
 
     return order_ids
 
+def get_item_description(client: StorageScholarsClient, order_id: int) -> str:
+    items: list[dict[str, Any]] = client.get_request(url=f"/order/items/{order_id}")
+    if len(items) == 0:
+        raise Exception("Items is None")
+    return ", ".join([f"{item["Quantity"]}x {item["ItemTitle"]}" for item in items])
+
 def main() -> None:
     logger.info(msg="Starting...")
     try:
@@ -49,14 +55,9 @@ def main() -> None:
         order_ids: list[int] = get_order_ids(file_name=ORDER_ID_FILE_NAME)
         logger.info(msg=f"Getting items for {len(order_ids)} order(s)")
 
-        item_descriptions = []
+        item_descriptions: list[str] = []
         for order_id in order_ids:
-            items: list[dict[str, Any]] = client.get_request(url=f"/order/items/{order_id}")
-            if len(items) == 0:
-                raise Exception("Items is None")
-            
-            item_description = ", ".join([f"{item["Quantity"]}x {item["ItemTitle"]}" for item in items])
-            item_descriptions.append(item_description)
+            item_descriptions.append(get_item_description(client=client, order_id=order_id))
             time.sleep(REQUEST_DELAY)
 
         print(item_descriptions)
