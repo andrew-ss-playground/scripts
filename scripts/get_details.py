@@ -28,16 +28,15 @@ def get_client() -> StorageScholarsClient:
         raise Exception("Missing api key")
     return StorageScholarsClient(api_key=api_key)
 
-def get_rows_and_fieldnames(file_name: str) -> tuple[list[dict[str, Any]], list[str]]:
+def get_rows(file_name: str) -> list[dict[str, Any]]:
     with open(file_name, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         rows = list(reader)
-        fieldnames = list(reader.fieldnames) if reader.fieldnames else []
     
-    if not rows or not fieldnames:
+    if rows is None:
         raise Exception("No data or headers found in input CSV.")
     
-    return rows, fieldnames
+    return rows
 
 def get_order_id(row: dict) -> int:
     order_id_str = row.get("OrderID") or row.get(next(iter(row)))
@@ -108,7 +107,7 @@ def main() -> None:
         client: StorageScholarsClient = get_client()
         logger.info(msg=f"Connected to Storage Scholars client")
 
-        old_rows, fieldnames = get_rows_and_fieldnames(ORDER_IDS_FILE_NAME)
+        old_rows = get_rows(ORDER_IDS_FILE_NAME)
         logger.info(msg=f"Getting details for {len(old_rows)} order(s)")
 
         new_rows = get_updated_rows(client=client, old_rows=old_rows)
