@@ -10,10 +10,10 @@ def parse_phone(raw_phone: Any) -> str | None:
 
 def parse_full_location(row) -> str:
     dropoff_parts = [
-        getattr(row, "DropoffLocation", ""),
-        getattr(row, "DropoffDormRoomNumber", ""),
-        getattr(row, "DropoffDormRoomLetter", ""),
-        getattr(row, "DropoffAddressLine1", ""),
-        getattr(row, "DropoffAddressLine2", ""),
+        row["DropoffLocation"],
+        row["DropoffDormRoomNumber"],
+        row["DropoffDormRoomLetter"],
+        row["DropoffAddressLine1"],
+        row["DropoffAddressLine2"],
     ]
     return " ".join(str(part) for part in dropoff_parts if part not in (None, "", "None", "Off-Campus")).strip()
