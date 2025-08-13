@@ -1,6 +1,6 @@
 from services.client import StorageScholarsClient
 from utils.openai import ask_openai
-from utils.parsing import parse_phone, parse_full_location
+from utils.parsing import parse_phone, parse_full_location, parse_int
 
 import os
 from dotenv import load_dotenv
@@ -50,7 +50,7 @@ def get_order_id(row: dict) -> int:
     else:
         raise ValueError(f"Row does not have an order ID")
 
-def generate_comments(data: dict[str, Any]) -> str:
+def generate_comments(client: StorageScholarsClient, data: dict[str, Any]) -> str:
     comments = []
     if str(data.get("Cancelled", "0")) == "1":
         comments.append("Order was canceled.")
@@ -58,8 +58,9 @@ def generate_comments(data: dict[str, Any]) -> str:
         comments.append("Order was deleted.")
     if data.get("DropoffPersonName") and data.get("DropoffPersonPhone"):
         comments.append(f"Call proxy {data['DropoffPersonName']} at {parse_phone(data['DropoffPersonPhone'])}")
-    if data['Balance'] > 0:
+    if parse_int(data['Balance']) or 0 > 0:
         comments.append("Call customer to pay pending balance.")
+    comments.extend(client.fetch_internal_notes(data['OrderID']))
     return " ".join(comments)
 
 def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -68,7 +69,7 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any
         for key, old_row in enumerate(old_rows):
             try:
                 order_id = get_order_id(old_row)
-                first_name = old_row["FullName"].split(" ")[0]
+                first_name = old_row.get("FullName", "").split(" ")[0]
                 pronunciation = ask_openai(f"In one word, no fluff, give me the pronunciation of the first name {first_name}") or ""
                 
                 items: list[dict[str, Any]] = client.fetch_items(order_id=order_id)
@@ -93,9 +94,8 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any
 
                     'Storage Unit': storage_unit,
                     'Parent Phone': parse_phone(old_row['ParentPhone']),
-                    'Image Ct': len(image_file_names),
-                    'Comments': generate_comments(old_row),
-                    # 'Comments': internal notes,
+                    'Image Ct.': len(image_file_names),
+                    'Comments': generate_comments(client=client, data=old_row),
                 })
                 # download image
             except Exception as error_message:

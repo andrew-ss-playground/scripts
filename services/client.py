@@ -2,7 +2,7 @@ import requests
 from typing import Any
 import logging
 import os
-from utils.parsing import parse_file_type
+from utils.parsing import parse_file_type, parse_date
 
 LOG_LEVEL = logging.INFO
 
@@ -61,7 +61,7 @@ class StorageScholarsClient:
         return file_name
 
     def fetch_dropoff_info(self, order_id: int) -> dict[str, Any]:
-        dropoff_info =  self._get_request(url=f"/worklist/dropoff", params={'OrderID': order_id})
+        dropoff_info = self._get_request(url=f"/worklist/dropoff", params={'OrderID': order_id})
         if dropoff_info is None or dropoff_info.get('StorageUnitName') is None or dropoff_info.get('Quadrant') is None:
             raise Exception(f"Could not get storage unit info for order {order_id}")
         return dropoff_info
@@ -75,7 +75,7 @@ class StorageScholarsClient:
     def fetch_images(self, order_id: int) -> list[str]:
         image_file_names: list[str] = []
 
-        image_datas = self._get_request(url=f"/order/images", params={"OrderID": order_id})
+        image_datas = self._get_request(url=f"/order/images", params={"orderID": order_id})
         if image_datas is None:
             raise Exception(f"No images found for order {order_id}")
 
@@ -91,5 +91,18 @@ class StorageScholarsClient:
 
         return image_file_names
 
-    def fetch_internal_notes(self, order_id: int) -> None:
-        pass
+    def fetch_internal_notes(self, order_id: int) -> list[str]:
+        internal_notes: list[str] = []
+
+        internal_notes_data = self._get_request(url=f"/order/internalNote/{order_id}")
+        if internal_notes_data is not None and len(internal_notes_data) > 0:
+            for note in internal_notes_data:
+                comment = note['Comment']
+                username = note['AddedByUserName']
+                date = parse_date(note['CreatedDate'])
+                is_deleted = note['Deleted'] == '1'
+                internal_note = f"{'DELETED ' if is_deleted else ''}Internal note by {username} on {date}: {comment}{'' if comment.endswith(".") else '.'}"
+                internal_notes.append(internal_note)
+
+        return internal_notes
+
