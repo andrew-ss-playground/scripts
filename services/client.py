@@ -103,13 +103,13 @@ class StorageScholarsClient:
 
     def fetch_items(self, order_id: int) -> list[dict[str, Any]]:
         """
-        Fetch items for an order.
+        Fetch items for an order, aggregating identical items by ItemTitle.
 
         Args:
             order_id (int): The order ID.
 
         Returns:
-            list[dict[str, Any]]: List of items.
+            list[dict[str, Any]]: List of aggregated items.
 
         Raises:
             StorageScholarsClientError: If items are missing.
@@ -118,7 +118,18 @@ class StorageScholarsClient:
         if not items:
             logger.warning(f"No items found for order {order_id}")
             raise StorageScholarsClientError(f"Could not get items for order {order_id}")
-        return items
+
+        # Aggregate items by ItemTitle
+        aggregated = {}
+        for item in items:
+            title = item.get("ItemTitle", "Unknown")
+            qty = int(item.get("Quantity", 1))
+            if title in aggregated:
+                aggregated[title]["Quantity"] += qty
+            else:
+                aggregated[title] = {"ItemTitle": title, "Quantity": qty}
+            
+        return list(aggregated.values())
 
     def fetch_images(self, order_id: int) -> list[str]:
         """
