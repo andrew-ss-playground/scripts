@@ -1,25 +1,27 @@
 import requests
-from typing import Any
+from typing import Any, Optional
 import logging
 import os
 from utils.parsing import parse_file_type, parse_date
 
-LOG_LEVEL = logging.INFO
+logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(name=__name__)
+BASE_URL = "https://api.storagescholars.com"
+IMAGES_DIR = os.path.join("data", "images")
+TIMEOUT_DURATION = 10
+
+class StorageScholarsClientError(Exception):
+    """Custom exception for StorageScholarsClient errors."""
 
 class StorageScholarsClient:
     def __init__(self, api_key: str) -> None:
-        """Initialize the client
+        """
+        Initialize the StorageScholarsClient.
 
         Args:
-            api_key (str): Bearer token for authorization
+            api_key (str): Bearer token for authorization.
         """
-
-        self.BASE_URL: str = "https://api.storagescholars.com"
-        self.TIMEOUT_DURATION: int = 10
-        self.IMAGES_DIR: str = "data\\images"
-        self.session: requests.Session = requests.Session()
+        self.session = requests.Session()
         self.session.headers.update({
             'Authorization': f'Bearer {api_key}',
             'Accept': 'application/json',
@@ -30,79 +32,141 @@ class StorageScholarsClient:
             'sec-ch-ua-mobile': '?0',
         })
 
-    def _get_request(self, url: str, params: dict[str, Any] = {}) -> Any:
-        """Sends a get request with the client
+    def _get_request(self, url: str, params: Optional[dict[str, Any]] = None) -> Any:
+        """
+        Send a GET request.
 
         Args:
-            url (str): URL to send the request to
-            params (dict[str, Any], optional): Dictionary of parameters. Defaults to {}.
+            url (str): Endpoint URL (relative to BASE_URL).
+            params (Optional[dict[str, Any]]): Query parameters.
 
         Returns:
-            Any: JSON dictionary of request response. None if errors.
+            Any: JSON response.
+
+        Raises:
+            StorageScholarsClientError: On request failure.
         """
+        full_url = f"{BASE_URL}{url}"
         try:
-            url = f"{self.BASE_URL}{url}"
-            response: requests.Response = self.session.get(url=url, params=params, timeout=self.TIMEOUT_DURATION)
+            logger.debug(f"GET {full_url} params={params}")
+            response = self.session.get(full_url, params=params, timeout=TIMEOUT_DURATION)
             response.raise_for_status()
             return response.json()
-        except requests.RequestException as error_message:
-            raise Exception(f"Get request failed: {error_message}")
-        except Exception as error_message:
-            raise Exception(f"Unexpected error: {error_message}")
+        except requests.RequestException as e:
+            logger.error(f"Request failed: {e}")
+            raise StorageScholarsClientError(f"Get request failed: {e}")
 
     def _download_image(self, image_url: str, file_name: str) -> str:
-        image_url_response = requests.get(url=image_url, timeout=self.TIMEOUT_DURATION)
-        image_url_response.raise_for_status()
-        
-        image_bytes = image_url_response.content
-        with open(file_name, "wb") as f:
-            f.write(image_bytes)
-        logger.debug(f"Downloaded {file_name}")
-        return file_name
+        """
+        Download an image from a URL and save it locally.
+
+        Args:
+            image_url (str): The image URL.
+            file_name (str): The local file path.
+
+        Returns:
+            str: The saved file path.
+
+        Raises:
+            StorageScholarsClientError: On download failure.
+        """
+        try:
+            response = requests.get(image_url, timeout=TIMEOUT_DURATION)
+            response.raise_for_status()
+            os.makedirs(os.path.dirname(file_name), exist_ok=True)
+            with open(file_name, "wb") as f:
+                f.write(response.content)
+            logger.debug(f"Downloaded image to {file_name}")
+            return file_name
+        except Exception as e:
+            logger.error(f"Failed to download image: {e}")
+            raise StorageScholarsClientError(f"Failed to download image: {e}")
 
     def fetch_dropoff_info(self, order_id: int) -> dict[str, Any]:
-        dropoff_info = self._get_request(url=f"/worklist/dropoff", params={'OrderID': order_id})
-        if dropoff_info is None or dropoff_info.get('StorageUnitName') is None or dropoff_info.get('Quadrant') is None:
-            raise Exception(f"Could not get storage unit info for order {order_id}")
+        """
+        Fetch dropoff info for an order.
+
+        Args:
+            order_id (int): The order ID.
+
+        Returns:
+            dict[str, Any]: Dropoff info.
+
+        Raises:
+            StorageScholarsClientError: If info is missing.
+        """
+        dropoff_info = self._get_request("/worklist/dropoff", params={'OrderID': order_id})
+        if not dropoff_info or not dropoff_info.get('StorageUnitName') or not dropoff_info.get('Quadrant'):
+            logger.warning(f"Could not get storage unit info for order {order_id}")
+            raise StorageScholarsClientError(f"Could not get storage unit info for order {order_id}")
         return dropoff_info
 
     def fetch_items(self, order_id: int) -> list[dict[str, Any]]:
-        items = self._get_request(url=f"/order/items/{order_id}")
-        if items is None or len(items) == 0:
-            raise Exception(f"Could not get items for order {order_id}")
+        """
+        Fetch items for an order.
+
+        Args:
+            order_id (int): The order ID.
+
+        Returns:
+            list[dict[str, Any]]: List of items.
+
+        Raises:
+            StorageScholarsClientError: If items are missing.
+        """
+        items = self._get_request(f"/order/items/{order_id}")
+        if not items:
+            logger.warning(f"No items found for order {order_id}")
+            raise StorageScholarsClientError(f"Could not get items for order {order_id}")
         return items
 
     def fetch_images(self, order_id: int) -> list[str]:
-        image_file_names: list[str] = []
+        """
+        Fetch and download images for an order.
 
-        image_datas = self._get_request(url=f"/order/images", params={"orderID": order_id})
-        if image_datas is None:
-            raise Exception(f"No images found for order {order_id}")
+        Args:
+            order_id (int): The order ID.
 
-        os.makedirs(self.IMAGES_DIR, exist_ok=True)
+        Returns:
+            list[str]: List of local image file paths.
+
+        Raises:
+            StorageScholarsClientError: If images are missing.
+        """
+        image_file_names = []
+        image_datas = self._get_request("/order/images", params={"orderID": order_id})
+        if not image_datas:
+            logger.warning(f"No images found for order {order_id}")
+            raise StorageScholarsClientError(f"No images found for order {order_id}")
+
+        os.makedirs(IMAGES_DIR, exist_ok=True)
         for image_index, image_dict in enumerate(image_datas, start=1):
-            image_url: str = image_dict.get("ImageURL")
-            
-            file_ext: str = parse_file_type(image_dict.get("Filepath", ""))
-            file_name: str = os.path.join(self.IMAGES_DIR, f"{order_id}_{image_index}.{file_ext}")
-            
+            image_url = image_dict.get("ImageURL")
+            file_ext = parse_file_type(image_dict.get("Filepath", ""))
+            file_name = os.path.join(IMAGES_DIR, f"{order_id}_{image_index}.{file_ext}")
             file_name = self._download_image(image_url, file_name)
             image_file_names.append(file_name)
 
         return image_file_names
 
     def fetch_internal_notes(self, order_id: int) -> list[str]:
-        internal_notes: list[str] = []
+        """
+        Fetch internal notes for an order.
 
-        internal_notes_data = self._get_request(url=f"/order/internalNote/{order_id}")
-        if internal_notes_data is not None and len(internal_notes_data) > 0:
+        Args:
+            order_id (int): The order ID.
+
+        Returns:
+            list[str]: List of formatted internal notes.
+        """
+        internal_notes = []
+        internal_notes_data = self._get_request(f"/order/internalNote/{order_id}")
+        if internal_notes_data:
             for note in internal_notes_data:
-                comment = note['Comment']
-                username = note['AddedByUserName']
-                date = parse_date(note['CreatedDate'])
-                is_deleted = note['Deleted'] == '1'
-                internal_note = f"{'DELETED ' if is_deleted else ''}Internal note by {username} on {date}: {comment}{'' if comment.endswith(".") else '.'}"
-                internal_notes.append(internal_note)
-
+                comment = note.get('Comment', '')
+                username = note.get('AddedByUserName', 'Unknown')
+                created_date = parse_date(note.get('CreatedDate'))
+                is_deleted = note.get('Deleted') == '1'
+                note_str = f"{'DELETED ' if is_deleted else ''}Internal note by {username} on {created_date}: {comment}{'' if comment.endswith('.') else '.'}"
+                internal_notes.append(note_str)
         return internal_notes
-
