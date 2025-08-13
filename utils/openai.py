@@ -14,11 +14,11 @@ logging.getLogger("httpx").setLevel(logging.WARNING)  # Suppress httpx info logs
 load_dotenv()
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano")
-OPENAI_API_KEY = os.getenv("OPEN_AI_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not OPENAI_API_KEY:
-    logger.error("OPEN_AI_KEY environment variable not set.")
-    raise EnvironmentError("OPEN_AI_KEY environment variable not set.")
+    logger.error("OPENAI_API_KEY environment variable not set.")
+    raise EnvironmentError("OPENAI_API_KEY environment variable not set.")
 
 _client: Optional[OpenAI] = None
 
