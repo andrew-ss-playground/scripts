@@ -2,6 +2,7 @@ import requests
 from typing import Any, Optional
 import logging
 import os
+import time
 from utils.parsing import parse_file_type, parse_date
 
 logger = logging.getLogger(__name__)
@@ -9,6 +10,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://api.storagescholars.com"
 IMAGES_DIR = os.path.join("data", "images")
 TIMEOUT_DURATION = 10
+REQUEST_DELAY = 0.3
 
 class StorageScholarsClientError(Exception):
     """Custom exception for StorageScholarsClient errors."""
@@ -51,6 +53,7 @@ class StorageScholarsClient:
             logger.debug(f"GET {full_url} params={params}")
             response = self.session.get(full_url, params=params, timeout=TIMEOUT_DURATION)
             response.raise_for_status()
+            time.sleep(REQUEST_DELAY)
             return response.json()
         except requests.RequestException as e:
             logger.error(f"Request failed: {e}")

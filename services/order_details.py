@@ -6,14 +6,11 @@ Business logic for fetching and transforming order details.
 from typing import Any, List, Dict
 from alive_progress import alive_bar
 import logging
-import time
 
 from utils.comments import generate_comments
 from utils.parsing import parse_phone, parse_full_location
 from utils.openai import ask_openai
 from services.client import StorageScholarsClient
-
-REQUEST_DELAY = 0.3
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +99,5 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: List[Dict[str, Any
             except Exception as error:
                 logger.warning(f"Failed to fetch details for row #{idx}: {error}")
             bar()
-            time.sleep(REQUEST_DELAY)
     logger.info(f"Updated details of {len(new_rows)} order(s).")
     return new_rows
