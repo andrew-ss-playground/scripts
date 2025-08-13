@@ -17,3 +17,9 @@ def parse_full_location(row) -> str:
         row["DropoffAddressLine2"],
     ]
     return " ".join(str(part) for part in dropoff_parts if part not in (None, "", "None", "Off-Campus")).strip()
+
+def parse_file_type(filepath: str) -> str:
+    if "." in filepath:
+        return filepath.split(".")[-1]
+    else:
+        raise Exception(f"{filepath} is missing a file type")

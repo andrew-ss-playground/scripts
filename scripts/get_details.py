@@ -50,6 +50,18 @@ def get_order_id(row: dict) -> int:
     else:
         raise ValueError(f"Row does not have an order ID")
 
+def generate_comments(data: dict[str, Any]) -> str:
+    comments = []
+    if str(data.get("Cancelled", "0")) == "1":
+        comments.append("Order was canceled.")
+    if str(data.get("Deleted", "0")) == "1":
+        comments.append("Order was deleted.")
+    if data.get("DropoffPersonName") and data.get("DropoffPersonPhone"):
+        comments.append(f"Call proxy {data['DropoffPersonName']} at {parse_phone(data['DropoffPersonPhone'])}")
+    if data['Balance'] > 0:
+        comments.append("Call customer to pay pending balance.")
+    return " ".join(comments)
+
 def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     new_rows: list[dict[str, Any]] = []
     with alive_bar(len(old_rows), title="Fetching orders") as bar:
@@ -65,6 +77,8 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any
                 dropoff_info: dict[str, Any] = client.fetch_dropoff_info(order_id)
                 storage_unit: str = f"{dropoff_info['StorageUnitName']} {dropoff_info['Quadrant']}" if dropoff_info else ""
 
+                image_file_names = client.fetch_images(order_id)
+
                 new_rows.append({
                     "ID": old_row.get('OrderID'),
                     "Name": old_row.get('FullName'),
@@ -79,7 +93,9 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any
 
                     'Storage Unit': storage_unit,
                     'Parent Phone': parse_phone(old_row['ParentPhone']),
-                    # 'Comments': get_comments(old_row), # proxy name, proxy phone, has pending balance, internal notes, image count
+                    'Image Ct': len(image_file_names),
+                    'Comments': generate_comments(old_row),
+                    # 'Comments': internal notes,
                 })
                 # download image
             except Exception as error_message:

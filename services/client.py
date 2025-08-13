@@ -1,6 +1,8 @@
 import requests
 from typing import Any
 import logging
+import os
+from utils.parsing import parse_file_type
 
 LOG_LEVEL = logging.INFO
 
@@ -16,6 +18,7 @@ class StorageScholarsClient:
 
         self.BASE_URL: str = "https://api.storagescholars.com"
         self.TIMEOUT_DURATION: int = 10
+        self.IMAGES_DIR: str = "data\\images"
         self.session: requests.Session = requests.Session()
         self.session.headers.update({
             'Authorization': f'Bearer {api_key}',
@@ -47,6 +50,16 @@ class StorageScholarsClient:
         except Exception as error_message:
             raise Exception(f"Unexpected error: {error_message}")
 
+    def _download_image(self, image_url: str, file_name: str) -> str:
+        image_url_response = requests.get(url=image_url, timeout=self.TIMEOUT_DURATION)
+        image_url_response.raise_for_status()
+        
+        image_bytes = image_url_response.content
+        with open(file_name, "wb") as f:
+            f.write(image_bytes)
+        logger.debug(f"Downloaded {file_name}")
+        return file_name
+
     def fetch_dropoff_info(self, order_id: int) -> dict[str, Any]:
         dropoff_info =  self._get_request(url=f"/worklist/dropoff", params={'OrderID': order_id})
         if dropoff_info is None or dropoff_info.get('StorageUnitName') is None or dropoff_info.get('Quadrant') is None:
@@ -59,8 +72,24 @@ class StorageScholarsClient:
             raise Exception(f"Could not get items for order {order_id}")
         return items
 
-    def fetch_images(self, order_id: int) -> None:
-        pass
+    def fetch_images(self, order_id: int) -> list[str]:
+        image_file_names: list[str] = []
+
+        image_datas = self._get_request(url=f"/order/images", params={"OrderID": order_id})
+        if image_datas is None:
+            raise Exception(f"No images found for order {order_id}")
+
+        os.makedirs(self.IMAGES_DIR, exist_ok=True)
+        for image_index, image_dict in enumerate(image_datas, start=1):
+            image_url: str = image_dict.get("ImageURL")
+            
+            file_ext: str = parse_file_type(image_dict.get("Filepath", ""))
+            file_name: str = os.path.join(self.IMAGES_DIR, f"{order_id}_{image_index}.{file_ext}")
+            
+            file_name = self._download_image(image_url, file_name)
+            image_file_names.append(file_name)
+
+        return image_file_names
 
     def fetch_internal_notes(self, order_id: int) -> None:
         pass
