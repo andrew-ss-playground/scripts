@@ -23,10 +23,14 @@ def add_suffix_to_file_name(file_name, suffix):
 
 def get_client() -> StorageScholarsClient:
     load_dotenv()
+    
     api_key: str | None = os.getenv(key="SS_API_KEY")
     if api_key is None:
-        raise Exception("Missing api key")
-    return StorageScholarsClient(api_key=api_key)
+        raise Exception("Missing API key")
+    
+    client = StorageScholarsClient(api_key=api_key)
+    logger.info(msg=f"Connected to Storage Scholars client")
+    return client
 
 def get_rows(file_name: str) -> list[dict[str, Any]]:
     with open(file_name, newline='', encoding='utf-8') as csvfile:
@@ -36,11 +40,12 @@ def get_rows(file_name: str) -> list[dict[str, Any]]:
     if rows is None:
         raise Exception("No data or headers found in input CSV.")
     
+    logger.info(msg=f"Getting details for {len(rows)} order(s)")
     return rows
 
 def get_order_id(row: dict) -> int:
     order_id_str = row.get("OrderID") or row.get(next(iter(row)))
-    if order_id_str and order_id_str.isdigit():
+    if order_id_str is not None and order_id_str.isdigit():
         return int(order_id_str)
     else:
         raise ValueError(f"Row does not have an order ID")
@@ -65,7 +70,7 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any
                     "Name": old_row.get('FullName'),
                     'Pronunciation': pronunciation,
                     'Phone': parse_phone(old_row['StudentPhone']),
-                    'Location': parse_full_location(old_row), # TODO: Not working
+                    'Location': parse_full_location(old_row),
                     'Ct.': old_row.get('ItemCount'),
                     'Items': items_text,
                     'Time Loaded': '',
@@ -82,6 +87,8 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any
             
             bar()
             time.sleep(REQUEST_DELAY) 
+
+    logger.info(msg=f"Updated details of {len(new_rows)} order(s).")
     return new_rows
 
 def write_to_csv(file_name: str, rows: list[dict]) -> str:
@@ -99,23 +106,19 @@ def write_to_csv(file_name: str, rows: list[dict]) -> str:
             file_name = add_suffix_to_file_name(file_name=file_name, suffix=f" ({attempt})")
         except Exception as error_message:
             raise(error_message)
+        
+    logger.info(msg=f"Saved rows to {file_name}.")
     return file_name
 
 def main() -> None:
     logger.info(msg="Starting...")
     try:
         client: StorageScholarsClient = get_client()
-        logger.info(msg=f"Connected to Storage Scholars client")
-
         old_rows = get_rows(ORDER_IDS_FILE_NAME)
-        logger.info(msg=f"Getting details for {len(old_rows)} order(s)")
-
         new_rows = get_updated_rows(client=client, old_rows=old_rows)
-        logger.info(msg=f"Updated details of {len(new_rows)} order(s).")
-
+        
         output_file_name = add_suffix_to_file_name(ORDER_IDS_FILE_NAME, "_output")
-        file_name = write_to_csv(output_file_name, new_rows)
-        logger.info(msg=f"Saved rows to {file_name}.")
+        write_to_csv(output_file_name, new_rows)
     except Exception as error_message:
         logger.exception(msg=error_message)
     logger.info(msg="Finished")
