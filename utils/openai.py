@@ -13,5 +13,5 @@ client = OpenAI(api_key=os.getenv("OPEN_AI_KEY"))
 def ask_openai(input: str) -> str | None:
     try:
         return client.responses.create(model=OPENAI_MODEL, input=input).output_text
-    except Exception:
-        return None
+    except Exception as error_message:
+        raise Exception(f"Error asking ChatGPT: {error_message}")

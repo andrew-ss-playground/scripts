@@ -12,7 +12,7 @@ from alive_progress import alive_bar
 
 LOG_LEVEL = logging.INFO
 ORDER_IDS_FILE_NAME = "data\\order_ids_8-21-25.csv"
-REQUEST_DELAY = 0.6
+REQUEST_DELAY = 0 # 0.6
 
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(name=__name__)
@@ -46,31 +46,6 @@ def get_order_id(row: dict) -> int:
     else:
         raise ValueError(f"Row does not have an order ID")
 
-def fetch_item_description(client: StorageScholarsClient, order_id: int) -> str:
-    items: list[dict[str, Any]] = client.get_request(url=f"/order/items/{order_id}")
-    if items is None or len(items) == 0:
-        logging.warning(f"Could not get items for order {order_id}")
-        return ""
-    
-    return ", ".join([f"{item['Quantity']}x {item['ItemTitle']}" for item in items])
-
-def fetch_storage_unit(client: StorageScholarsClient, order_id: int) -> str:
-    url: str = "/worklist/dropoff"
-    params: dict[str, int] = {'OrderID': order_id}
-    dropoff_info: dict[str, Any] | None = client.get_request(url=url, params=params)
-    if dropoff_info is None or dropoff_info.get('StorageUnitName') is None or dropoff_info.get('Quadrant') is None:
-        logging.warning(f"Could not get storage unit info for order {order_id}")
-        return ""
-
-    return f"{dropoff_info['StorageUnitName']} {dropoff_info['Quadrant']}"
-
-def fetch_pronunciation(first_name: str) -> str | None:
-    try:
-        return ask_openai(f"In one word, no fluff, give me the pronunciation of the first name {first_name}")
-    except Exception as error_message:
-        logger.warning(f"Could not fetch pronunciation of {first_name}: {error_message}")
-        return None
-
 def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     new_rows: list[dict[str, Any]] = []
     with alive_bar(len(old_rows), title="Fetching orders") as bar:
@@ -78,22 +53,29 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: list[dict[str, Any
             try:
                 order_id = get_order_id(old_row)
                 first_name = old_row["FullName"].split(" ")[0]
+                pronunciation = ask_openai(f"In one word, no fluff, give me the pronunciation of the first name {first_name}") or ""
                 
+                items: list[dict[str, Any]] = client.fetch_items(order_id=order_id)
+                items_text: str =  ", ".join([f"{item['Quantity']}x {item['ItemTitle']}" for item in items]) if items else ""
+
+                dropoff_info: dict[str, Any] = client.fetch_dropoff_info(order_id)
+                storage_unit: str = f"{dropoff_info['StorageUnitName']} {dropoff_info['Quadrant']}" if dropoff_info else ""
+
                 new_rows.append({
                     "ID": old_row.get('OrderID'),
                     "Name": old_row.get('FullName'),
-                    'Pronunciation': fetch_pronunciation(first_name=first_name) or "",
+                    'Pronunciation': pronunciation,
                     'Phone': parse_phone(old_row['StudentPhone']),
-                    'Location': parse_full_location(old_row),
+                    'Location': parse_full_location(old_row), # TODO: Not working
                     'Ct.': old_row.get('ItemCount'),
-                    'Items': fetch_item_description(client=client, order_id=order_id),
+                    'Items': items_text,
                     'Time Loaded': '',
                     'Time Arrived': '',
                     'Time Delivered': '',
 
-                    'Storage Unit': fetch_storage_unit(client=client, order_id=order_id),
+                    'Storage Unit': storage_unit,
                     'Parent Phone': parse_phone(old_row['ParentPhone']),
-                    # 'Comments': get_comments(old_row), # proxy name, proxy phone, is first hour, is last hour, has pending balance
+                    # 'Comments': get_comments(old_row), # proxy name, proxy phone, has pending balance, internal notes, image count
                 })
                 # download image
             except Exception as error_message:

@@ -27,7 +27,7 @@ class StorageScholarsClient:
             'sec-ch-ua-mobile': '?0',
         })
 
-    def get_request(self, url: str, params: dict[str, Any] = {}) -> Any:
+    def _get_request(self, url: str, params: dict[str, Any] = {}) -> Any:
         """Sends a get request with the client
 
         Args:
@@ -46,3 +46,21 @@ class StorageScholarsClient:
             raise Exception(f"Get request failed: {error_message}")
         except Exception as error_message:
             raise Exception(f"Unexpected error: {error_message}")
+
+    def fetch_dropoff_info(self, order_id: int) -> dict[str, Any]:
+        dropoff_info =  self._get_request(url=f"/worklist/dropoff", params={'OrderID': order_id})
+        if dropoff_info is None or dropoff_info.get('StorageUnitName') is None or dropoff_info.get('Quadrant') is None:
+            raise Exception(f"Could not get storage unit info for order {order_id}")
+        return dropoff_info
+
+    def fetch_items(self, order_id: int) -> list[dict[str, Any]]:
+        items = self._get_request(url=f"/order/items/{order_id}")
+        if items is None or len(items) == 0:
+            raise Exception(f"Could not get items for order {order_id}")
+        return items
+
+    def fetch_images(self, order_id: int) -> None:
+        pass
+
+    def fetch_internal_notes(self, order_id: int) -> None:
+        pass
