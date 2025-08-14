@@ -11,6 +11,7 @@ from utils.comments import generate_comments
 from utils.parsing import parse_phone, parse_full_location, parse_date
 from utils.openai import ask_openai
 from services.client import StorageScholarsClient
+from config import IS_FETCH_IMAGES, IS_FETCH_OPENAI, IS_FETCH_ITEMS
 
 logger = logging.getLogger(__name__)
 
@@ -44,40 +45,38 @@ def build_row(client: StorageScholarsClient, old_row: Dict[str, Any]) -> Dict[st
         Dict[str, Any]: The enriched row.
     """
     order_id = get_order_id(old_row)
-    first_name = (old_row.get("FullName") or "").split(" ")[0]
-    pronunciation = ask_openai(
-        f"In one word, no fluff, give me the pronunciation of the first name {first_name}"
-    ) or ""
-
-    items = client.fetch_items(order_id=order_id)
-    items_text = ", ".join(
-        f"{item['Quantity']}x {item['ItemTitle']}" for item in items
-    ) if items else ""
-
     dropoff_info = client.fetch_dropoff_info(order_id)
     storage_unit = (
         f"{dropoff_info.get('StorageUnitName', '')} {dropoff_info.get('Quadrant', '')}".strip()
         if dropoff_info else ""
-    )
-    
-    image_file_names = client.fetch_images(order_id)
+    ) or ""
+    pronunciation = ask_openai(
+        f"In one word, no fluff, give me the pronunciation of the first name {dropoff_info.get("FirstName")}"
+    ) or "" if IS_FETCH_OPENAI else ""
+
+    items = client.fetch_items(order_id=order_id) if IS_FETCH_ITEMS else []
+    items_text = ", ".join(
+        f"{item['Quantity']}x {item['ItemTitle']}" for item in items
+    ) if items else ""
+
+    image_file_names = client.fetch_images(order_id) if IS_FETCH_IMAGES else []
 
     return {
-        "ID": old_row.get("OrderID"),
-        "Name": old_row.get("FullName"),
+        "ID": dropoff_info.get("OrderID"),
+        "Name": f"{dropoff_info.get("FirstName")} {dropoff_info.get("LastName")}",
         "Pronunciation": pronunciation,
-        "Phone": parse_phone(old_row["StudentPhone"]) if old_row.get("StudentPhone") else "",
-        "Location": parse_full_location(old_row),
-        "Ct.": old_row.get("ItemCount"),
+        "Phone": parse_phone(dropoff_info["StudentPhone"]) if dropoff_info.get("StudentPhone") else "",
+        "Location": parse_full_location(dropoff_info),
+        "Ct.": len(items),
         "Items": items_text,
-        "Dropoff Date": parse_date(old_row["DropoffDate"]) if old_row.get("DropoffDate") else "",
+        "Dropoff Date": parse_date(dropoff_info["DropoffDate"]) if dropoff_info.get("DropoffDate") else "",
         "Time Loaded": "",
         "Time Arrived": "",
         "Time Delivered": "",
         "Storage Unit": storage_unit,
-        "Parent Phone": parse_phone(old_row["ParentPhone"]) if old_row.get("ParentPhone") else "",
+        "Parent Phone": parse_phone(dropoff_info["ParentPhone"]) if dropoff_info.get("ParentPhone") else "",
         "Image Ct.": len(image_file_names),
-        "Comments": generate_comments(client=client, data=old_row),
+        "Comments": generate_comments(client=client, old_data=old_row, new_data=dropoff_info),
     }
 
 def get_updated_rows(client: StorageScholarsClient, old_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

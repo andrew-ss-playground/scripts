@@ -4,13 +4,9 @@ import logging
 import os
 import time
 from utils.parsing import parse_file_type, parse_date
+from config import BASE_URL, IMAGES_DIR, TIMEOUT_DURATION, REQUEST_DELAY
 
 logger = logging.getLogger(__name__)
-
-BASE_URL = "https://api.storagescholars.com"
-IMAGES_DIR = os.path.join("data", "images")
-TIMEOUT_DURATION = 10
-REQUEST_DELAY = 0.3
 
 class StorageScholarsClientError(Exception):
     """Custom exception for StorageScholarsClient errors."""
@@ -102,9 +98,8 @@ class StorageScholarsClient:
         if not dropoff_info:
             logger.warning(f"Could not get dropoff info info for order {order_id}")
             raise StorageScholarsClientError(f"Could not get dropoff info info for order {order_id}")
-        elif dropoff_info.get('OrderType') == '1' and not dropoff_info.get('StorageUnitName'):
+        elif not dropoff_info.get('StorageUnitName'):
             logger.warning(f"Could not get storage unit info for order {order_id}")
-            raise StorageScholarsClientError(f"Could not get storage unit info for order {order_id}")
         return dropoff_info
 
     def fetch_items(self, order_id: int) -> list[dict[str, Any]]:

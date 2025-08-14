@@ -6,17 +6,12 @@ import os
 import logging
 from typing import Optional
 from openai import OpenAI
-from dotenv import load_dotenv
+from config import OPENAI_MODEL, OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)  # Suppress httpx info logs
 
-load_dotenv()
-
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-if not OPENAI_API_KEY:
+if OPENAI_API_KEY is None:
     logger.error("OPENAI_API_KEY environment variable not set.")
     raise EnvironmentError("OPENAI_API_KEY environment variable not set.")
 
