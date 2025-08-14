@@ -88,7 +88,7 @@ def parse_date(val: Any) -> Optional[date]:
 
 def parse_int(val: Any) -> Optional[int]:
     """
-    Parse a value into an integer, returning None if zero or invalid.
+    Parse a value into an integer, rounding floats, returning None if zero or invalid.
 
     Args:
         val (Any): The value to parse.
@@ -97,7 +97,7 @@ def parse_int(val: Any) -> Optional[int]:
         Optional[int]: The parsed integer, or None if invalid or zero.
     """
     try:
-        i = int(val)
+        i = int(round(float(val)))
         return i if i != 0 else None
     except (TypeError, ValueError):
         logger.warning(f"Could not parse int from value: {val}")
