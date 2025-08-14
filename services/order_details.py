@@ -8,7 +8,7 @@ from alive_progress import alive_bar
 import logging
 
 from utils.comments import generate_comments
-from utils.parsing import parse_phone, parse_full_location
+from utils.parsing import parse_phone, parse_full_location, parse_date
 from utils.openai import ask_openai
 from services.client import StorageScholarsClient
 
@@ -59,22 +59,23 @@ def build_row(client: StorageScholarsClient, old_row: Dict[str, Any]) -> Dict[st
         f"{dropoff_info.get('StorageUnitName', '')} {dropoff_info.get('Quadrant', '')}".strip()
         if dropoff_info else ""
     )
-
+    
     image_file_names = client.fetch_images(order_id)
 
     return {
         "ID": old_row.get("OrderID"),
         "Name": old_row.get("FullName"),
         "Pronunciation": pronunciation,
-        "Phone": parse_phone(old_row.get("StudentPhone")),
+        "Phone": parse_phone(old_row["StudentPhone"]) if old_row.get("StudentPhone") else "",
         "Location": parse_full_location(old_row),
         "Ct.": old_row.get("ItemCount"),
         "Items": items_text,
+        "Dropoff Date": parse_date(old_row["DropoffDate"]) if old_row.get("DropoffDate") else "",
         "Time Loaded": "",
         "Time Arrived": "",
         "Time Delivered": "",
         "Storage Unit": storage_unit,
-        "Parent Phone": parse_phone(old_row.get("ParentPhone")),
+        "Parent Phone": parse_phone(old_row["ParentPhone"]) if old_row.get("ParentPhone") else "",
         "Image Ct.": len(image_file_names),
         "Comments": generate_comments(client=client, data=old_row),
     }

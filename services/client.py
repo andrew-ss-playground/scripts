@@ -99,7 +99,10 @@ class StorageScholarsClient:
             StorageScholarsClientError: If info is missing.
         """
         dropoff_info = self._get_request("/worklist/dropoff", params={'OrderID': order_id})
-        if not dropoff_info or not dropoff_info.get('StorageUnitName') or not dropoff_info.get('Quadrant'):
+        if not dropoff_info:
+            logger.warning(f"Could not get dropoff info info for order {order_id}")
+            raise StorageScholarsClientError(f"Could not get dropoff info info for order {order_id}")
+        elif dropoff_info.get('OrderType') == '1' and not dropoff_info.get('StorageUnitName'):
             logger.warning(f"Could not get storage unit info for order {order_id}")
             raise StorageScholarsClientError(f"Could not get storage unit info for order {order_id}")
         return dropoff_info

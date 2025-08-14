@@ -19,7 +19,7 @@ def parse_phone(raw_phone: Any) -> Optional[str]:
         digits = digits[1:]
     if len(digits) != 10:
         logger.warning(f"Invalid phone number: {raw_phone}")
-        return None
+        return raw_phone
     return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
 
 def parse_full_location(row: dict[str, Any]) -> str:
@@ -78,7 +78,7 @@ def parse_date(val: Any) -> Optional[date]:
     if isinstance(val, date):
         return val
     if isinstance(val, str):
-        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%m/%d/%Y"):
             try:
                 return datetime.strptime(val, fmt).date()
             except Exception:

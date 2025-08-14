@@ -35,6 +35,7 @@ def generate_comments(client: StorageScholarsClient, data: dict[str, Any]) -> st
         comments.append(f"Call proxy {dropoff_name} at {formatted_phone}")
     
     balance = parse_int(data.get("Balance"))
+    print(data["FullName"], data["Balance"])
     if balance is not None and balance > 0:
         comments.append("Call customer to pay pending balance.")
     
