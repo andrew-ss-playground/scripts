@@ -50,6 +50,6 @@ def generate_comments(client: StorageScholarsClient, old_data, new_data: dict[st
             internal_notes = client.fetch_internal_notes(order_id) if IS_FETCH_INTERNAL_NOTES else []
             comments.extend(internal_notes)
         except Exception as e:
-            logger.warning(f"Failed to fetch internal notes for order {order_id}: {e}")
+            logger.warning(f"Failed to fetch internal notes for order {order_id}: {e}. Continuing...")
     
     return " ".join(comments)

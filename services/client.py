@@ -96,10 +96,10 @@ class StorageScholarsClient:
         """
         dropoff_info = self._get_request("/worklist/dropoff", params={'OrderID': order_id})
         if not dropoff_info:
-            logger.warning(f"Could not get dropoff info info for order {order_id}")
+            logger.warning(f"Could not get dropoff info info for order {order_id}. Raising error...")
             raise StorageScholarsClientError(f"Could not get dropoff info info for order {order_id}")
         elif not dropoff_info.get('StorageUnitName'):
-            logger.warning(f"Could not get storage unit info for order {order_id}")
+            logger.warning(f"Could not get storage unit info for order {order_id}. Continuing...")
         return dropoff_info
 
     def fetch_items(self, order_id: int) -> list[dict[str, Any]]:
@@ -117,7 +117,7 @@ class StorageScholarsClient:
         """
         items = self._get_request(f"/order/items/{order_id}")
         if not items:
-            logger.warning(f"No items found for order {order_id}")
+            logger.warning(f"No items found for order {order_id}. Raising error...")
             raise StorageScholarsClientError(f"Could not get items for order {order_id}")
 
         # Aggregate items by ItemTitle
@@ -148,7 +148,7 @@ class StorageScholarsClient:
         image_file_names = []
         image_datas = self._get_request("/order/images", params={"orderID": order_id})
         if not image_datas:
-            logger.warning(f"No images found for order {order_id}")
+            logger.warning(f"No images found for order {order_id}. Raising error...")
             raise StorageScholarsClientError(f"No images found for order {order_id}")
 
         os.makedirs(IMAGES_DIR, exist_ok=True)

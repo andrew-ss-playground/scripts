@@ -55,7 +55,7 @@ def write_to_csv(file_name: str, rows: List[Dict[str, Any]]) -> str:
                 writer.writerows(rows)
             break
         except PermissionError:
-            logger.warning(f"Could not write to {file_name}, trying again...")
+            logger.warning(f"Could not write to {file_name}. Retrying...")
             attempt += 1
             file_name = add_suffix_to_file_name(file_name=file_name, suffix=f" ({attempt})")
         except Exception as error_message:

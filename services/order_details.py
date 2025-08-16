@@ -97,7 +97,7 @@ def get_updated_rows(client: StorageScholarsClient, old_rows: List[Dict[str, Any
                 new_row = build_row(client, old_row)
                 new_rows.append(new_row)
             except Exception as error:
-                logger.warning(f"Failed to fetch details for row #{idx}: {error}")
+                logger.warning(f"Failed to fetch details for row #{idx}: {error}. Continuing...")
             bar()
     logger.info(f"Updated details of {len(new_rows)} order(s).")
     return new_rows

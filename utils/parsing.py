@@ -18,7 +18,7 @@ def parse_phone(raw_phone: Any) -> Optional[str]:
     if digits.startswith('1') and len(digits) == 11:
         digits = digits[1:]
     if len(digits) != 10:
-        logger.warning(f"Invalid phone number: {raw_phone}")
+        logger.warning(f"Invalid phone number: {raw_phone}. Continuing...")
         return raw_phone
     return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
 
@@ -83,7 +83,7 @@ def parse_date(val: Any) -> Optional[date]:
                 return datetime.strptime(val, fmt).date()
             except Exception:
                 continue
-        logger.warning(f"Could not parse date from value: {val}")
+        logger.warning(f"Could not parse date from value: {val}. Continuing...")
     return None
 
 def parse_int(val: Any) -> Optional[int]:
@@ -100,5 +100,5 @@ def parse_int(val: Any) -> Optional[int]:
         i = int(round(float(val)))
         return i if i != 0 else None
     except (TypeError, ValueError):
-        logger.warning(f"Could not parse int from value: {val}")
+        logger.warning(f"Could not parse int from value: {val}. Continuing...")
         return None
