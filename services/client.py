@@ -151,11 +151,18 @@ class StorageScholarsClient:
             logger.warning(f"No images found for order {order_id}. Raising error...")
             raise StorageScholarsClientError(f"No images found for order {order_id}")
 
-        os.makedirs(IMAGES_DIR, exist_ok=True)
+        # Fetch dropoff info to get dropoff date
+        dropoff_info = self.fetch_dropoff_info(order_id)
+        dropoff_date = dropoff_info.get("DropoffDate", "")
+        # Clean the date string for folder naming (e.g., 2024-08-17)
+        safe_date = dropoff_date.replace("/", "-").replace("\\", "-").replace(":", "-").strip() if dropoff_date else "unknown_date"
+        images_subdir = os.path.join(IMAGES_DIR, safe_date)
+        os.makedirs(images_subdir, exist_ok=True)
+
         for image_index, image_dict in enumerate(image_datas, start=1):
             image_url = image_dict.get("ImageURL")
             file_ext = parse_file_type(image_dict.get("Filepath", ""))
-            file_name = os.path.join(IMAGES_DIR, f"{order_id}_{image_index}.{file_ext}")
+            file_name = os.path.join(images_subdir, f"{order_id}_{image_index}.{file_ext}")
             file_name = self._download_image(image_url, file_name)
             image_file_names.append(file_name)
 
