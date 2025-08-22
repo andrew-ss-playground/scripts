@@ -54,10 +54,16 @@ def build_row(client: StorageScholarsClient, old_row: Dict[str, Any]) -> Dict[st
         f"In one word, no fluff, give me the pronunciation of the first name {dropoff_info.get("FirstName")}"
     ) or "" if IS_FETCH_OPENAI else ""
 
-    items = client.fetch_items(order_id=order_id) if IS_FETCH_ITEMS else []
-    items_text = ", ".join(
-        f"{item['Quantity']}x {item['ItemTitle']}" for item in items
-    ) if items else ""
+    item_count = 0
+    if IS_FETCH_ITEMS:
+        items = client.fetch_items(order_id=order_id)
+        items, item_count = client.fetch_items(order_id)
+
+        items_text = ", ".join(
+            f"{item['Quantity']}x {item['ItemTitle']}" for item in items
+        )
+    else:
+        items_text = ""
 
     image_file_names = client.fetch_images(order_id) if IS_FETCH_IMAGES else []
 
@@ -67,7 +73,7 @@ def build_row(client: StorageScholarsClient, old_row: Dict[str, Any]) -> Dict[st
         "Pronunciation": pronunciation,
         "Phone": parse_phone(dropoff_info["StudentPhone"]) if dropoff_info.get("StudentPhone") else "",
         "Location": parse_full_location(dropoff_info),
-        "Ct.": len(items),
+        "Ct.": item_count,
         "Items": items_text,
         "Dropoff Date": parse_date(dropoff_info["DropoffDate"]) if dropoff_info.get("DropoffDate") else "",
         "Time Loaded": "",

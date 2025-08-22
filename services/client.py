@@ -102,7 +102,7 @@ class StorageScholarsClient:
             logger.warning(f"Could not get storage unit info for order {order_id}. Continuing...")
         return dropoff_info
 
-    def fetch_items(self, order_id: int) -> list[dict[str, Any]]:
+    def fetch_items(self, order_id: int) -> tuple[list[dict[str, Any]], int]:
         """
         Fetch items for an order, aggregating identical items by ItemTitle.
 
@@ -110,7 +110,7 @@ class StorageScholarsClient:
             order_id (int): The order ID.
 
         Returns:
-            list[dict[str, Any]]: List of aggregated items.
+            tuple: (List of aggregated items, total item count)
 
         Raises:
             StorageScholarsClientError: If items are missing.
@@ -122,15 +122,17 @@ class StorageScholarsClient:
 
         # Aggregate items by ItemTitle
         aggregated = {}
+        total_count = 0
         for item in items:
             title = item.get("ItemTitle", "Unknown")
             qty = int(item.get("Quantity", 1))
+            total_count += qty
             if title in aggregated:
                 aggregated[title]["Quantity"] += qty
             else:
                 aggregated[title] = {"ItemTitle": title, "Quantity": qty}
             
-        return list(aggregated.values())
+        return list(aggregated.values()), total_count
 
     def fetch_images(self, order_id: int) -> list[str]:
         """
